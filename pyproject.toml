@@ -6,11 +6,11 @@ authors = [
     { name = "Lucien Krapp", email = "lucienkrapp@gmail.com" }
 ]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = [
     "gemmi>=0.7.0",
     "mrcfile>=1.5.3",
-    "numpy>=2.2.1",
+    "numpy>=2.0.2",
     "torch>=2.5.1",
 ]
 license = { file = "LICENSE.md" }
