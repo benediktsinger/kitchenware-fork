@@ -6,7 +6,7 @@ authors = [
     { name = "Lucien Krapp", email = "lucienkrapp@gmail.com" }
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "gemmi>=0.7.0",
     "mrcfile>=1.5.3",
