@@ -2,7 +2,7 @@ import numpy as np
 import torch as pt
 import numpy.typing as npt
 from typing import Generator
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields,field
 
 
 @dataclass
@@ -13,15 +13,22 @@ class Structure:
     resnames: npt.NDArray[np.str_]
     resids: npt.NDArray[np.int32]
     chain_names: npt.NDArray[np.str_]
-
+    charges: npt.NDArray[np.float32] = None
+    
+    def __post_init__(self):
+        # Initialize charges with zeros if not provided
+        if self.charges is None or len(self.charges) == 0:
+            # Use the length of xyz (assuming xyz is always populated)
+            n_atoms = len(self.xyz)
+            self.charges = np.zeros(n_atoms, dtype=np.float32)
+    
     def __iter__(self):
         for field in fields(self):
             yield field.name
 
     def __getitem__(self, idx):
         return Structure(**{key: getattr(self, key)[idx] for key in self})
-
-
+    
 @dataclass
 class StructureData:
     X: pt.Tensor
@@ -32,14 +39,12 @@ class StructureData:
     Mc: pt.Tensor
 
     def to(self, device):
-        return StructureData(
-            X=self.X.to(device),
-            qe=self.qe.to(device),
-            qr=self.qr.to(device),
-            qn=self.qn.to(device),
-            Mr=self.Mr.to(device),
-            Mc=self.Mc.to(device),
-        )
+        self.X.to(device)
+        self.qe.to(device)
+        self.qr.to(device)
+        self.qn.to(device)
+        self.Mr.to(device)
+        self.Mc.to(device)
 
     def cpu(self):
         self.to(pt.device("cpu"))

@@ -75,6 +75,7 @@ from .structure import (
 )
 from .structure_io import (
     StructuresDataset,
+    StructuresDatasetPlinder,
     load_structure,
     save_pdb,
     save_traj_pdb,
