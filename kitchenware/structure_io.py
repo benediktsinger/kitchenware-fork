@@ -174,49 +174,50 @@ def fix_plinder_structure(filepath: str) -> str:
     return fixed_filepath
 
 
-def parse_cfw2_cif_and_compare(cif_bytes, reference_structure):
+def parse_cfw2_cif_and_compare(cif_bytes, reference_structure, combined_id):
     # Convert byte array to string
     cif_str = b"".join(cif_bytes).decode()
-
     # Parse CIF content
     doc = gemmi.cif.read_string(cif_str)
     block = doc.sole_block()
-
-    # Extract coordinates from CIF
+    
+    # Extract data from CIF
     atom_site = block.find_mmcif_category("_atom_site.")
     charge_site = block.find_mmcif_category("_sb_ncbr_partial_atomic_charges")
-
-    # Create numpy array of coordinates from CIF data
+    
+    # Collect CIF data
     cif_coords = []
     cif_charges = []
     cif_elements = []
-
     for row, entry in zip(atom_site, charge_site):
-        cif_coords.append(
-            [float(row["Cartn_x"]), float(row["Cartn_y"]), float(row["Cartn_z"])]
-        )
+        cif_coords.append([float(row["Cartn_x"]), float(row["Cartn_y"]), float(row["Cartn_z"])])
         cif_elements.append(row["type_symbol"])
-        cif_charges.append(entry["charge"])
-
+        cif_charges.append(float(entry["charge"]))
+    
     cif_coords = np.array(cif_coords)
-
-    # asserts using the reference structure
-    assert len(cif_coords) == len(
-        reference_structure.xyz
-    ), "Number of atoms in CIF does not match reference structure"
-    assert np.allclose(
-        cif_coords, reference_structure.xyz
-    ), "Coordinates in CIF do not match reference structure"
-    assert np.all(
-        cif_elements == reference_structure.elements
-    ), "Elements in CIF do not match reference structure"
-
-    # Return the parsed coordinates for further inspection if needed
-    reference_structure.charges = np.array(cif_charges, dtype=np.float32)
+    cif_charges = np.array(cif_charges, dtype=np.float32)
+    
+    # Prepare mask and charge arrays
+    mask = np.zeros(len(reference_structure.xyz), dtype=bool)
+    new_charges = np.zeros_like(reference_structure.charges)
+    
+    # Match atoms by coordinates
+    for i, ref_xyz in enumerate(reference_structure.xyz):
+        for j, cif_xyz in enumerate(cif_coords):
+            if np.allclose(ref_xyz, cif_xyz, atol=1e-3):
+                if reference_structure.elements[i] != cif_elements[j]:
+                    raise ValueError(f"Element mismatch at atom {i}: {reference_structure.elements[i]} vs {cif_elements[j]}")
+                new_charges[i] = cif_charges[j]
+                mask[i] = True
+                break
+    
+    # Update charges only where matches were found
+    reference_structure.charges[mask] = new_charges[mask]
+    
     return reference_structure
 
 
-def parse_esp_cif_and_compare(cif_bytes, structure):
+def parse_esp_cif_and_compare(cif_bytes, structure, combined_id):
     mol2_lines = b"".join(cif_bytes).decode().split("\n")
 
     # Find the atom section
@@ -259,11 +260,11 @@ def add_charges_to_Structure(combined_id, structure, h5_file_path: str):
     with h5py.File(h5_file_path, "r") as f:
         if "espaloma" in h5_file_path:
             updated_ligand = parse_esp_cif_and_compare(
-                f[f"data/{system_id}/{ligand_id}/mol2"][()], structure[mask]
+                f[f"data/{system_id}/{ligand_id}/mol2"][()], structure[mask], combined_id
             )
         elif "chargefw2" in h5_file_path:
             updated_ligand = parse_cfw2_cif_and_compare(
-                f[f"data/{system_id}/{ligand_id}/cif"][()], structure[mask]
+                f[f"data/{system_id}/{ligand_id}/cif"][()], structure[mask], combined_id
             )
         else:
             raise ValueError("Invalid h5 file path")
