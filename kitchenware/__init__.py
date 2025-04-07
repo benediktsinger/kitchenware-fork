@@ -60,6 +60,7 @@ from .standard_encoding import (
     std_elements,
     std_names,
     std_resnames,
+    partial_charge_bins
 )
 from .standard_template import (
     std_templates,

@@ -35,6 +35,7 @@ class StructureData:
     qe: pt.Tensor
     qr: pt.Tensor
     qn: pt.Tensor
+    qc: pt.Tensor
     Mr: pt.Tensor
     Mc: pt.Tensor
 
@@ -43,6 +44,7 @@ class StructureData:
         self.qe.to(device)
         self.qr.to(device)
         self.qn.to(device)
+        self.qc.to(device)
         self.Mr.to(device)
         self.Mc.to(device)
 
@@ -55,6 +57,7 @@ class StructureData:
             qe=self.qe[idx],
             qr=self.qr[idx],
             qn=self.qn[idx],
+            qc=self.qc[idx],
             Mr=self.Mr[idx][:, pt.sum(self.Mr[idx], dim=0) > 0.5],
             Mc=self.Mc[idx][:, pt.sum(self.Mc[idx], dim=0) > 0.5],
         )

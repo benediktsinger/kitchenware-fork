@@ -2,7 +2,7 @@ import numpy as np
 import torch as pt
 
 from .dtype import Structure, StructureData
-from .standard_encoding import std_elements, std_names, std_resnames
+from .standard_encoding import std_elements, std_names, std_resnames, partial_charge_bins
 from .metrics import secondary_structure
 
 
@@ -29,8 +29,11 @@ def encode_structure(structure: Structure, device=pt.device("cpu")):
     qe = pt.from_numpy(onehot(structure.elements, std_elements).astype(np.float32)).to(device)
     qr = pt.from_numpy(onehot(structure.resnames, std_resnames).astype(np.float32)).to(device)
     qn = pt.from_numpy(onehot(structure.names, std_names).astype(np.float32)).to(device)
+    qc = pt.from_numpy(oneht(structure.partial_charges, partial_charge_bins).astype(np.float32)).to(device)
 
-    return StructureData(X=X, qe=qe, qr=qr, qn=qn, Mr=Mr, Mc=Mc)
+    import pdb; pdb.set_trace()
+
+    return StructureData(X=X, qe=qe, qr=qr, qn=qn, qc=qc,Mr=Mr, Mc=Mc)
 
 
 def encode_secondary_structure(data: StructureData) -> tuple[pt.Tensor, pt.Tensor]:
@@ -90,6 +93,10 @@ def data_to_structure(data: StructureData) -> Structure:
     resnames_enum = np.concatenate([std_resnames, [b"UNX"]])
     resnames = resnames_enum[np.where(data.qr.cpu().numpy())[1]]
 
+    #charges
+    charges_enum = np.concatenate([partial_charge_bins, [0.0]])
+    charges = charges_enum[np.where(data.qc.cpu().numpy())[1]]
+
     # resids
     ids0, ids1 = np.where(data.Mr.cpu().numpy() > 0.5)
     resids = np.zeros(data.Mr.shape[0], dtype=np.int32)
@@ -108,4 +115,5 @@ def data_to_structure(data: StructureData) -> Structure:
         resnames=resnames,
         resids=resids,
         chain_names=cids.astype(str),
+        charges=charges
     )

@@ -1,5 +1,6 @@
 import numpy as np
 
+partial_charge_bins = np.arange(20)
 
 # standard elements (sorted by aboundance) (32)
 std_elements = np.array(

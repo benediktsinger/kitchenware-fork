@@ -217,9 +217,8 @@ def parse_cfw2_cif_and_compare(cif_bytes, reference_structure, combined_id):
     return reference_structure
 
 
-def parse_esp_cif_and_compare(cif_bytes, structure, combined_id):
-    mol2_lines = b"".join(cif_bytes).decode().split("\n")
-
+def parse_esp_mol2_and_compare(mol2_bytes, structure, combined_id):
+    mol2_lines = b"".join(mol2_bytes).decode().split("\n")
     # Find the atom section
     atom_section_start = mol2_lines.index("@<TRIPOS>ATOM")
     atom_section_end = mol2_lines.index("@<TRIPOS>BOND")
@@ -252,14 +251,14 @@ def parse_esp_cif_and_compare(cif_bytes, structure, combined_id):
 
 def add_charges_to_Structure(combined_id, structure, h5_file_path: str):
     system_id, ligand_id = combined_id.split("/")
-
+    print(system_id, ligand_id)
     # Extract the ligand
     structure.chain_names = structure.chain_names.astype(str)
     mask = structure.chain_names == ligand_id
 
     with h5py.File(h5_file_path, "r") as f:
         if "espaloma" in h5_file_path:
-            updated_ligand = parse_esp_cif_and_compare(
+            updated_ligand = parse_esp_mol2_and_compare(
                 f[f"data/{system_id}/{ligand_id}/mol2"][()], structure[mask], combined_id
             )
         elif "chargefw2" in h5_file_path:
