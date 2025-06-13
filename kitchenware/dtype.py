@@ -14,6 +14,7 @@ class Structure:
     resids: npt.NDArray[np.int32]
     chain_names: npt.NDArray[np.str_]
     charges: npt.NDArray[np.float32] = None
+    active_site: npt.NDArray[np.bool_] = field(default_factory=lambda: np.array([], dtype=np.bool_))
     
     def __post_init__(self):
         # Initialize charges with zeros if not provided
@@ -36,6 +37,7 @@ class StructureData:
     qr: pt.Tensor
     qn: pt.Tensor
     qc: pt.Tensor
+    ac: pt.Tensor
     Mr: pt.Tensor
     Mc: pt.Tensor
 
@@ -45,6 +47,7 @@ class StructureData:
         self.qr.to(device)
         self.qn.to(device)
         self.qc.to(device)
+        self.ac.to(device)
         self.Mr.to(device)
         self.Mc.to(device)
 
@@ -58,6 +61,7 @@ class StructureData:
             qr=self.qr[idx],
             qn=self.qn[idx],
             qc=self.qc[idx],
+            ac=self.ac[idx],
             Mr=self.Mr[idx][:, pt.sum(self.Mr[idx], dim=0) > 0.5],
             Mc=self.Mc[idx][:, pt.sum(self.Mc[idx], dim=0) > 0.5],
         )

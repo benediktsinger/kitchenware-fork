@@ -1,5 +1,6 @@
 import gemmi
 import numpy as np
+import json
 import torch as pt
 import h5py
 import os
@@ -9,6 +10,15 @@ from pathlib import Path
 from .dtype import Structure
 from .structure import split_by_chain
 from .standard_encoding import std_resnames
+
+def add_active_site_to_structure(interactive_res_dict: dict, structure: Structure, pdb_id: str) -> None:
+    """
+    Add interactive residues to the structure based on the JSON data.
+    """
+    pdb_id = pdb_id.split("-")[0]  # Extract PDB ID from the filename
+    entry = interactive_res_dict[pdb_id]
+    for res in entry:
+        structure.active_site[structure.resids == res['residue_chains'][0]['resid']] = True
 
 
 def load_structure(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
@@ -61,8 +71,8 @@ def load_structure(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
         resnames=np.array(resname_l),
         resids=np.array(resid_l, dtype=np.int32),
         chain_names=np.array(chain_name_l),
+        active_site=np.zeros(len(resid_set), dtype=np.bool_),
     )
-
 
 def subunit_to_pdb_str(subunit: Structure, chain_name, bfactors={}):
     # extract data
@@ -173,6 +183,21 @@ def fix_plinder_structure(filepath: str) -> str:
 
     return fixed_filepath
 
+def read_custom_sdf_charge_file(file_path):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+    num_atoms = int(lines[3].split()[0])
+    mol = []
+    for atom in lines[4:num_atoms+4]:
+        mol.append((float(atom[0:10]), float(atom[10:20]), float(atom[20:30]), atom[30:34]))
+
+    partial_charges = []
+    for line in lines:
+        if ">" in line and "PARTIAL_CHARGES" in line:
+            line = lines[lines.index(line) + 1]
+            partial_charges = line.split(";")
+            break  
+    return mol, [float(x) for x in partial_charges]
 
 def parse_cfw2_cif_and_compare(cif_bytes, reference_structure, combined_id):
     # Convert byte array to string
@@ -217,8 +242,8 @@ def parse_cfw2_cif_and_compare(cif_bytes, reference_structure, combined_id):
     return reference_structure
 
 
-def parse_esp_mol2_and_compare(mol2_bytes, structure, combined_id):
-    mol2_lines = b"".join(mol2_bytes).decode().split("\n")
+def parse_esp_mol2_and_compare(ligand_filepath, structure, combined_id):
+    mol2_lines = b"".join(ligand_filepath).decode().split("\n")
     # Find the atom section
     atom_section_start = mol2_lines.index("@<TRIPOS>ATOM")
     atom_section_end = mol2_lines.index("@<TRIPOS>BOND")
@@ -248,25 +273,43 @@ def parse_esp_mol2_and_compare(mol2_bytes, structure, combined_id):
 
     return structure
 
+def parse_esp_charges_and_compare(ligand_filepath, structure):
+    charges_file = ligand_filepath.replace('.sdf', '_charges.sdf')
+    mol, partial_charges = read_custom_sdf_charge_file(charges_file)
+    # Create a boolean mask arrays
+    mask = np.zeros(len(structure.charges), dtype=bool)
+    new_charges = np.zeros_like(structure.charges)
 
-def add_charges_to_Structure(combined_id, structure, h5_file_path: str):
+    for i, xyz in enumerate(structure.xyz):
+        for line in mol:
+            if np.allclose(xyz, line[0:3], atol=1e-3):
+                new_charges[i] = partial_charges[mol.index(line)]
+                mask[i] = True
+                break  # Move to next atom in structure
+
+    # Update the structure's charges only where mask is True
+    structure.charges[mask] = new_charges[mask]
+
+    return structure
+
+
+def add_charges_to_Structure(combined_id, structure, ligand_filepath, file_path: str):
     system_id, ligand_id = combined_id.split("/")
-    print(system_id, ligand_id)
-    # Extract the ligand
     structure.chain_names = structure.chain_names.astype(str)
     mask = structure.chain_names == ligand_id
-
-    with h5py.File(h5_file_path, "r") as f:
-        if "espaloma" in h5_file_path:
-            updated_ligand = parse_esp_mol2_and_compare(
-                f[f"data/{system_id}/{ligand_id}/mol2"][()], structure[mask], combined_id
-            )
-        elif "chargefw2" in h5_file_path:
+    if "espaloma_charges" in file_path:
+        updated_ligand = parse_esp_charges_and_compare(ligand_filepath, structure)
+    elif "espaloma" in file_path:
+        updated_ligand = parse_esp_mol2_and_compare(
+           ligand_filepath, structure[mask], combined_id
+        )
+    elif "chargefw2" in file_path:
+        with h5py.File(file_path, "r") as f:
             updated_ligand = parse_cfw2_cif_and_compare(
                 f[f"data/{system_id}/{ligand_id}/cif"][()], structure[mask], combined_id
             )
-        else:
-            raise ValueError("Invalid h5 file path")
+    else:
+        raise ValueError("Invalid charge file path")
 
     # Create a new structure with the same attributes as the original
     structure.charges[mask] = updated_ligand.charges
@@ -293,6 +336,37 @@ class StructuresDataset(pt.utils.data.Dataset):
 
         # parse pdb
         structure = load_structure(pdb_filepath)
+        return structure, pdb_filepath
+    
+class StructuresDatasetEC(pt.utils.data.Dataset):
+    def __init__(self, pdb_filepaths, rm_wat=False, rm_clash=False, interactive_res_file=''):
+        super(StructuresDataset).__init__()
+        # store dataset filepath
+        self.pdb_filepaths = pdb_filepaths
+
+        # load interactive residues from JSON file
+        if os.path.exists(interactive_res_file):
+            with open(interactive_res_file, "r") as f:
+                interactive_res_dict = json.load(f)
+        else:
+            raise FileNotFoundError(f"Interactive residues file {interactive_res_file} not found.")
+
+        self.interactive_res_dict = interactive_res_dict
+
+        # store flag
+        self.rm_wat = rm_wat
+        self.rm_clash = rm_clash
+
+    def __len__(self):
+        return len(self.pdb_filepaths)
+
+    def __getitem__(self, i) -> tuple[Structure | None, str]:
+        # find pdb filepath
+        pdb_filepath = self.pdb_filepaths[i]
+
+        # parse pdb
+        structure = load_structure(pdb_filepath)
+        structure = add_active_site_to_structure(self.interactive_res_dict, structure, pdb_id=Path(pdb_filepath).stem)
         return structure, pdb_filepath
 
 
@@ -332,7 +406,8 @@ class StructuresDatasetPlinder(pt.utils.data.Dataset):
                 try:
                     structure = add_charges_to_Structure(
                         combined_id, 
-                        structure, 
+                        structure,
+                        ligand_file, 
                         self.partial_charges_file
                     )
                 except KeyError as e:  # Catch missing HDF5 entries

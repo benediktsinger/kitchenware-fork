@@ -29,11 +29,10 @@ def encode_structure(structure: Structure, device=pt.device("cpu")):
     qe = pt.from_numpy(onehot(structure.elements, std_elements).astype(np.float32)).to(device)
     qr = pt.from_numpy(onehot(structure.resnames, std_resnames).astype(np.float32)).to(device)
     qn = pt.from_numpy(onehot(structure.names, std_names).astype(np.float32)).to(device)
-    qc = pt.from_numpy(oneht(structure.partial_charges, partial_charge_bins).astype(np.float32)).to(device)
+    qc = pt.from_numpy(onehot(structure.charges, partial_charge_bins).astype(np.float32)).to(device)
+    ac = pt.from_numpy(onehot(structure.active_site, [0, 1]).astype(np.float32)).to(device)
 
-    import pdb; pdb.set_trace()
-
-    return StructureData(X=X, qe=qe, qr=qr, qn=qn, qc=qc,Mr=Mr, Mc=Mc)
+    return StructureData(X=X, qe=qe, qr=qr, qn=qn, qc=qc, ac=ac, Mr=Mr, Mc=Mc)
 
 
 def encode_secondary_structure(data: StructureData) -> tuple[pt.Tensor, pt.Tensor]:
