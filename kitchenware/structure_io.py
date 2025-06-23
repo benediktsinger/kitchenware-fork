@@ -342,8 +342,6 @@ class StructuresDatasetEC(pt.utils.data.Dataset):
     def __init__(self, pdb_filepaths, rm_wat=False, rm_clash=False, interactive_res_file=''):
         super(StructuresDataset).__init__()
 
-        #pdb_ids = {file.split("-")[0][-4:]:file for file in pdb_filepaths}
-
         # load interactive residues from JSON file
         if os.path.exists(interactive_res_file):
             with open(interactive_res_file, "r") as f:
@@ -351,18 +349,13 @@ class StructuresDatasetEC(pt.utils.data.Dataset):
         else:
             raise FileNotFoundError(f"Interactive residues file {interactive_res_file} not found.")
 
-        print(len(pdb_filepaths))
-        for pdb_file in pdb_filepaths:
-            if pdb_file.split("-")[0][-4:] not in interactive_res_dict.keys():
-                pdb_filepaths.remove(pdb_file)
-            else:
-                import pdb;pdb.set_trace()     
-        print(len(pdb_filepaths))
+        pdb_filepaths = [
+            file for file in pdb_filepaths 
+            if file.split("-")[0][-4:] in interactive_res_dict.keys()
+        ])
 
         self.interactive_res_dict = interactive_res_dict
         self.pdb_filepaths = pdb_filepaths
-
-        #set(pdb_ids.keys()).intersection(set(interactive_res_dict.keys()))
 
         # store flag
         self.rm_wat = rm_wat
