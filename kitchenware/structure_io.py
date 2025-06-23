@@ -71,7 +71,7 @@ def load_structure(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
         resnames=np.array(resname_l),
         resids=np.array(resid_l, dtype=np.int32),
         chain_names=np.array(chain_name_l),
-        active_site=np.zeros(len(resid_set), dtype=np.bool_),
+        active_site=np.zeros(len(resid_l), dtype=np.bool_),
     )
 
 def subunit_to_pdb_str(subunit: Structure, chain_name, bfactors={}):
