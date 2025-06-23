@@ -352,7 +352,7 @@ class StructuresDatasetEC(pt.utils.data.Dataset):
         pdb_filepaths = [
             file for file in pdb_filepaths 
             if file.split("-")[0][-4:] in interactive_res_dict.keys()
-        ])
+            ])
 
         self.interactive_res_dict = interactive_res_dict
         self.pdb_filepaths = pdb_filepaths
