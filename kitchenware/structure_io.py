@@ -19,6 +19,7 @@ def add_active_site_to_structure(interactive_res_dict: dict, structure: Structur
     entry = interactive_res_dict[pdb_id]
     for res in entry:
         structure.active_site[structure.resids == res['residue_chains'][0]['resid']] = True
+    return structure
 
 
 def load_structure(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
