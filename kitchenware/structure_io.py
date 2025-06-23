@@ -17,8 +17,8 @@ def add_active_site_to_structure(interactive_res_dict: dict, structure: Structur
     """
     pdb_id = pdb_id.split("-")[0]  # Extract PDB ID from the filename
     entry = interactive_res_dict[pdb_id]
-    for res in entry:
-        structure.active_site[structure.resids == res['residue_chains'][0]['resid']] = True
+    for res in entry['active_site']:
+        structure.active_site[structure.resids == res['resid']] = True
     return structure
 
 
