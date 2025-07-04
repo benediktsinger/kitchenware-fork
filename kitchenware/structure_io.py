@@ -18,9 +18,50 @@ def add_active_site_to_structure(interactive_res_dict: dict, structure: Structur
     pdb_id = pdb_id.split("-")[0]  # Extract PDB ID from the filename
     entry = interactive_res_dict[pdb_id]
     for res in entry['active_site']:
-        structure.active_site[structure.resids == res['resid']] = True
+        structure.active_site[structure.resids_ndb == res['resid']] = True
     return structure
 
+def load_structure_ndb(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
+    # use gemmi to parse file
+    doc = gemmi.read_structure(filepath)
+
+    altloc_set, resid_set = set(), set()
+    xyz_l, element_l, name_l, resname_l, resid_l, chain_name_l, label_seq_l = [], [], [], [], [], [], []
+
+    for _, model in enumerate(doc):
+        for a in model.all():
+            if rm_hs and ((a.atom.element.name == "H") or (a.atom.element.name == "D")):
+                continue
+            if rm_wat and ((a.residue.name == "HOH") or (a.residue.name == "DOD")):
+                continue
+            if a.atom.has_altloc():
+                key = f"{a.chain.name}_{a.residue.seqid.num}_{a.residue.name}_{a.atom.name}"
+                if key in altloc_set:
+                    continue
+                else:
+                    altloc_set.add(key)
+
+            resid_key = f"{a.chain.name}_{a.residue.seqid.num}_{a.residue.seqid.icode.strip()}"
+            resid_set.add(resid_key)
+            resid_l.append(len(resid_set))
+            label_seq_l.append(a.residue.label_seq)
+
+            xyz_l.append([a.atom.pos.x, a.atom.pos.y, a.atom.pos.z])
+            element_l.append(a.atom.element.name)
+            name_l.append(a.atom.name)
+            resname_l.append(a.residue.name)
+            chain_name_l.append(a.chain.name)
+
+    return Structure(
+        xyz=np.array(xyz_l, dtype=np.float32),
+        names=np.array(name_l),
+        elements=np.array(element_l),
+        resnames=np.array(resname_l),
+        resids=np.array(resid_l, dtype=np.int32),
+        chain_names=np.array(chain_name_l),
+        resids_ndb=np.array(label_seq_l, dtype=np.int32),
+        active_site=np.zeros(len(resid_l), dtype=np.bool_),
+    )
 
 def load_structure(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
     # use gemmi to parse file

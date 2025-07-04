@@ -13,6 +13,7 @@ class Structure:
     resnames: npt.NDArray[np.str_]
     resids: npt.NDArray[np.int32]
     chain_names: npt.NDArray[np.str_]
+    resids_ndb: npt.NDArray[np.int32] = None
     charges: npt.NDArray[np.float32] = None
     active_site: npt.NDArray[np.bool_] = field(default_factory=lambda: np.array([], dtype=np.bool_))
     
