@@ -15,15 +15,17 @@ def add_active_site_to_structure(interactive_res_dict: dict, structure: Structur
     """
     Add interactive residues to the structure based on the JSON data.
     """
+
     pdb_id = pdb_id.split("_")[0]  # Extract PDB ID from the filename
     entry = interactive_res_dict[pdb_id]
+
     for res in entry['active_site']:
-        if res['code'].upper() in np.unique(structure[structure.resids_ndb == str(res['resid'])].resnames):
-            structure.active_site[structure.resids_ndb == res['resid']] = True
-        elif res['code'].upper() in np.unique(structure[structure.resids == res['resid']].resnames):
-            structure.active_site[structure.resids == res['resid']] = True
-    if not np.sum(structure.active_site) == len(interactive_res_dict[pdb_id]["active_site"]):
+        if res['code'].upper() in np.unique(structure[structure.resids_ndb[:, 1] == res['resid']].resnames):
+            structure.active_site[structure.resids_ndb[:, 1] == res['resid']] = True
+
+    if not np.sum(structure.active_site) == np.sum(np.isin(structure.resids_ndb[:, 1], np.array([i['resid'] for i in entry['active_site']]))):
         structure.active_site = np.zeros(len(structure.resids), dtype=np.bool_)
+        
     return structure
 
 def load_structure_unp(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
@@ -35,9 +37,11 @@ def load_structure_unp(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
     xyz_l, element_l, name_l, resname_l, resid_l, resid_unp_l, chain_name_l, label_seq_l = [], [], [], [], [], [], [], []
 
     for (_, model), (_, model_atom) in zip(enumerate(doc), enumerate(doc_cif)):
-        blk = model_atom.find(['_atom_site.id','_atom_site.pdbx_sifts_xref_db_num'])
-        atom_serial_to_unp = {int(id):unp for id, unp in zip(blk.find_column('_atom_site.id'), blk.find_column('_atom_site.pdbx_sifts_xref_db_num'))}
-
+        try:
+            atom_serial_to_unp = {int(id):unp for id, unp in zip(model_atom.find_mmcif_category('_atom_site').find_column('id'), model_atom.find_mmcif_category('_atom_site').find_column('pdbx_sifts_xref_db_num'))}
+        except RuntimeError:
+            #init as '?'
+            atom_serial_to_unp = {int(id): '?' for id in model_atom.find_mmcif_category('_atom_site').find_column('id')}
         for a in model.all():
                         # skip hydrogens and deuterium
             if rm_hs and ((a.atom.element.name == "H") or (a.atom.element.name == "D")):
@@ -57,23 +61,23 @@ def load_structure_unp(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
             resid_key = f"{a.chain.name}_{a.residue.seqid.num}_{a.residue.seqid.icode.strip()}"
             resid_set.add(resid_key)
             resid_l.append(len(resid_set))
+            #print(a.residue.label_seq)
             label_seq_l.append(a.residue.label_seq)
-            resid_unp_l.append(atom_serial_to_unp.get(a.atom.serial))
-
+            resid_unp_l.append(atom_serial_to_unp.get(a.atom.serial))  # pdbx_sifts_xref_db_num
             xyz_l.append([a.atom.pos.x, a.atom.pos.y, a.atom.pos.z])
             element_l.append(a.atom.element.name)
             name_l.append(a.atom.name)
             resname_l.append(a.residue.name)
             chain_name_l.append(a.chain.name)
 
-        # pack data
+    # pack data
     return Structure(
         xyz=np.array(xyz_l, dtype=np.float32),
         names=np.array(name_l),
         elements=np.array(element_l),
         resnames=np.array(resname_l),
         resids=np.array(resid_l, dtype=np.int32),
-        resids_ndb=np.array(resid_unp_l),
+        resids_ndb=np.array((resid_unp_l,label_seq_l)).T,
         chain_names=np.array(chain_name_l),
         active_site=np.zeros(len(resid_l), dtype=np.bool_),
     )
