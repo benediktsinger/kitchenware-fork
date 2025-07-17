@@ -11,29 +11,42 @@ from .dtype import Structure
 from .structure import split_by_chain
 from .standard_encoding import std_resnames
 
-def add_active_site_to_structure(interactive_res_dict: dict, structure: Structure, pdb_id: str) -> None:
+def add_active_site_to_structure(interactive_res_dict: dict, structure: Structure, pdb_id: str) -> Structure:
     """
     Add interactive residues to the structure based on the JSON data.
     """
-    pdb_id = pdb_id.split("-")[0]  # Extract PDB ID from the filename
+    pdb_id = pdb_id.split("_")[0]  # Extract PDB ID from the filename
     entry = interactive_res_dict[pdb_id]
     for res in entry['active_site']:
-        structure.active_site[structure.resids_ndb == res['resid']] = True
+        if res['code'].upper() in np.unique(structure[structure.resids_ndb == str(res['resid'])].resnames):
+            structure.active_site[structure.resids_ndb == res['resid']] = True
+        elif res['code'].upper() in np.unique(structure[structure.resids == res['resid']].resnames):
+            structure.active_site[structure.resids == res['resid']] = True
+    if not np.sum(structure.active_site) == len(interactive_res_dict[pdb_id]["active_site"]):
+        structure.active_site = np.zeros(len(structure.resids), dtype=np.bool_)
     return structure
 
-def load_structure_ndb(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
-    # use gemmi to parse file
+def load_structure_unp(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
+    # use gemmi to parse the structure and file
     doc = gemmi.read_structure(filepath)
+    doc_cif = gemmi.cif.read(filepath)
 
     altloc_set, resid_set = set(), set()
-    xyz_l, element_l, name_l, resname_l, resid_l, chain_name_l, label_seq_l = [], [], [], [], [], [], []
+    xyz_l, element_l, name_l, resname_l, resid_l, resid_unp_l, chain_name_l, label_seq_l = [], [], [], [], [], [], [], []
 
-    for _, model in enumerate(doc):
+    for (_, model), (_, model_atom) in zip(enumerate(doc), enumerate(doc_cif)):
+        blk = model_atom.find(['_atom_site.id','_atom_site.pdbx_sifts_xref_db_num'])
+        atom_serial_to_unp = {int(id):unp for id, unp in zip(blk.find_column('_atom_site.id'), blk.find_column('_atom_site.pdbx_sifts_xref_db_num'))}
+
         for a in model.all():
+                        # skip hydrogens and deuterium
             if rm_hs and ((a.atom.element.name == "H") or (a.atom.element.name == "D")):
                 continue
+
+            # skip (heavy) water
             if rm_wat and ((a.residue.name == "HOH") or (a.residue.name == "DOD")):
                 continue
+
             if a.atom.has_altloc():
                 key = f"{a.chain.name}_{a.residue.seqid.num}_{a.residue.name}_{a.atom.name}"
                 if key in altloc_set:
@@ -45,6 +58,7 @@ def load_structure_ndb(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
             resid_set.add(resid_key)
             resid_l.append(len(resid_set))
             label_seq_l.append(a.residue.label_seq)
+            resid_unp_l.append(atom_serial_to_unp.get(a.atom.serial))
 
             xyz_l.append([a.atom.pos.x, a.atom.pos.y, a.atom.pos.z])
             element_l.append(a.atom.element.name)
@@ -52,14 +66,15 @@ def load_structure_ndb(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
             resname_l.append(a.residue.name)
             chain_name_l.append(a.chain.name)
 
+        # pack data
     return Structure(
         xyz=np.array(xyz_l, dtype=np.float32),
         names=np.array(name_l),
         elements=np.array(element_l),
         resnames=np.array(resname_l),
         resids=np.array(resid_l, dtype=np.int32),
+        resids_ndb=np.array(resid_unp_l),
         chain_names=np.array(chain_name_l),
-        resids_ndb=np.array(label_seq_l, dtype=np.int32),
         active_site=np.zeros(len(resid_l), dtype=np.bool_),
     )
 
