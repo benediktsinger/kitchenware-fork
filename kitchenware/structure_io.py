@@ -20,6 +20,7 @@ def add_active_site_to_structure(interactive_res_dict: dict, structure: Structur
     entry = interactive_res_dict[pdb_id]
 
     for res in entry['active_site']:
+        #import pdb; pdb.set_trace()
         if res['code'].upper() in np.unique(structure[structure.resids_ndb[:, 1] == res['resid']].resnames):
             structure.active_site[structure.resids_ndb[:, 1] == res['resid']] = True
 
@@ -411,8 +412,8 @@ class StructuresDatasetEC(pt.utils.data.Dataset):
             raise FileNotFoundError(f"Interactive residues file {interactive_res_file} not found.")
 
         pdb_filepaths = [
-            file for file in pdb_filepaths 
-            if file.split("-")[0][-4:] in interactive_res_dict.keys()
+            file for file in pdb_filepaths
+            if os.path.basename(file).split('_')[0] in interactive_res_dict.keys()
             ]
 
         self.interactive_res_dict = interactive_res_dict
@@ -430,7 +431,7 @@ class StructuresDatasetEC(pt.utils.data.Dataset):
         pdb_filepath = self.pdb_filepaths[i]
 
         # parse pdb
-        structure = load_structure(pdb_filepath)
+        structure = load_structure_unp(pdb_filepath)
         structure = add_active_site_to_structure(self.interactive_res_dict, structure, pdb_id=Path(pdb_filepath).stem)
         return structure, pdb_filepath
 
