@@ -79,7 +79,6 @@ from .structure_io import (
     StructuresDatasetEC,
     load_structure,
     load_structure_unp,
-    add_active_site_to_structure,
     save_pdb,
     save_traj_pdb,
     subunit_to_pdb_str,
