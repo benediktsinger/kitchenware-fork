@@ -13,7 +13,7 @@ class Structure:
     resnames: npt.NDArray[np.str_]
     resids: npt.NDArray[np.int32]
     chain_names: npt.NDArray[np.str_]
-    charges: npt.NDArray[np.float32]
+    charges: npt.NDArray[np.float32] = field(default_factory=lambda: np.array([], dtype=np.float32))
     active_site: npt.NDArray[np.bool_] = field(default_factory=lambda: np.array([], dtype=np.bool_))
     
     def __post_init__(self):
@@ -29,6 +29,12 @@ class Structure:
 
     def __getitem__(self, idx):
         return Structure(**{key: getattr(self, key)[idx] for key in self})
+
+    def combine(self, other: "Structure") -> "Structure":
+        return Structure(**{
+            f.name: np.concatenate([getattr(self, f.name), getattr(other, f.name)])
+            for f in fields(self)
+        })
     
 @dataclass
 class StructureData:
