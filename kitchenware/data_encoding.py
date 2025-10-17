@@ -96,6 +96,9 @@ def data_to_structure(data: StructureData) -> Structure:
     charges_enum = np.concatenate([partial_charge_bins, [0.0]])
     charges = charges_enum[np.where(data.qc.cpu().numpy())[1]]
 
+    # active site
+    active_site = np.where(data.ac.cpu().numpy())[1].astype(bool)
+
     # resids
     ids0, ids1 = np.where(data.Mr.cpu().numpy() > 0.5)
     resids = np.zeros(data.Mr.shape[0], dtype=np.int32)
@@ -114,5 +117,6 @@ def data_to_structure(data: StructureData) -> Structure:
         resnames=resnames,
         resids=resids,
         chain_names=cids.astype(str),
-        charges=charges
+        charges=charges,
+        active_site=active_site,
     )
