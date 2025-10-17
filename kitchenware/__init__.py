@@ -82,6 +82,7 @@ from .structure_io import (
     save_pdb,
     save_traj_pdb,
     subunit_to_pdb_str,
+    add_active_site_to_structure
 )
 
 __all__ = [
