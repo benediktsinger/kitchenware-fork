@@ -22,6 +22,10 @@ class Structure:
             # Use the length of xyz (assuming xyz is always populated)
             n_atoms = len(self.xyz)
             self.charges = np.zeros(n_atoms, dtype=np.float32)
+        # Initialize active_site with False if not provided
+        if self.active_site is None or len(self.active_site) == 0:
+            n_atoms = len(self.xyz)
+            self.active_site = np.zeros(n_atoms, dtype=np.bool_)
     
     def __iter__(self):
         for field in fields(self):
