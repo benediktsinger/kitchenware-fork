@@ -429,10 +429,14 @@ class StructuresDatasetEC(pt.utils.data.Dataset):
     def __getitem__(self, i) -> tuple[Structure | None, str]:
         # find pdb filepath
         pdb_filepath = self.pdb_filepaths[i]
+        try:
+            # parse pdb
+            structure = load_structure_unp(pdb_filepath)
+            structure = add_active_site_to_structure(self.interactive_res_dict, structure, pdb_id=Path(pdb_filepath).stem)
+        except Exception as e:
+            print(f"Error processing {pdb_filepath}: {str(e)}")
+            structure = None
 
-        # parse pdb
-        structure = load_structure_unp(pdb_filepath)
-        structure = add_active_site_to_structure(self.interactive_res_dict, structure, pdb_id=Path(pdb_filepath).stem)
         return structure, pdb_filepath
 
 
