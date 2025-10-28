@@ -19,6 +19,10 @@ def encode_structure(structure: Structure, device=pt.device("cpu")):
     resids = pt.from_numpy(structure.resids).to(device)
     Mr = (resids.unsqueeze(1) == pt.unique(resids).unsqueeze(0)).float()
 
+    # atom to ndb residues mapping
+    resids_ndb = pt.from_numpy(structure.resids_ndb).to(device)
+    Mr_unp = (resids_ndb.unsqueeze(1) == pt.unique(resids_ndb).unsqueeze(0)).float()
+
     # atom to chain mapping
     cids = pt.from_numpy(
         np.where(structure.chain_names.reshape(-1, 1) == np.unique(structure.chain_names).reshape(1, -1))[1]
@@ -32,7 +36,7 @@ def encode_structure(structure: Structure, device=pt.device("cpu")):
     qc = pt.from_numpy(onehot(structure.charges, partial_charge_bins).astype(np.float32)).to(device)
     ac = pt.from_numpy(onehot(structure.active_site, [0, 1]).astype(np.float32)).to(device)
 
-    return StructureData(X=X, qe=qe, qr=qr, qn=qn, qc=qc, ac=ac, Mr=Mr, Mc=Mc)
+    return StructureData(X=X, qe=qe, qr=qr, qn=qn, qc=qc, ac=ac, Mr=Mr, Mc=Mc, Mr_unp=Mr_unp)
 
 
 def encode_secondary_structure(data: StructureData) -> tuple[pt.Tensor, pt.Tensor]:
@@ -104,6 +108,11 @@ def data_to_structure(data: StructureData) -> Structure:
     resids = np.zeros(data.Mr.shape[0], dtype=np.int32)
     resids[ids0] = ids1 + 1
 
+    # resids_ndb
+    ids0, ids1 = np.where(data.Mr_unp.cpu().numpy() > 0.5)
+    resids_ndb = np.zeros(data.Mr_unp.shape[0], dtype=np.int32)
+    resids_ndb[ids0] = ids1 + 1
+
     # chains
     ids0, ids1 = np.where(data.Mc.cpu().numpy() > 0.5)
     cids = np.zeros(data.Mc.shape[0], dtype=np.int64)
@@ -119,4 +128,5 @@ def data_to_structure(data: StructureData) -> Structure:
         chain_names=cids.astype(str),
         charges=charges,
         active_site=active_site,
+        resids_ndb=resids_ndb,
     )

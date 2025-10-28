@@ -51,6 +51,7 @@ class StructureData:
     ac: pt.Tensor
     Mr: pt.Tensor
     Mc: pt.Tensor
+    Mr_unp: pt.Tensor
 
     def to(self, device):
         self.X.to(device)
@@ -61,6 +62,7 @@ class StructureData:
         self.ac.to(device)
         self.Mr.to(device)
         self.Mc.to(device)
+        self.Mr_unp.to(device)
 
     def cpu(self):
         self.to(pt.device("cpu"))
@@ -75,6 +77,7 @@ class StructureData:
             ac=self.ac[idx],
             Mr=self.Mr[idx][:, pt.sum(self.Mr[idx], dim=0) > 0.5],
             Mc=self.Mc[idx][:, pt.sum(self.Mc[idx], dim=0) > 0.5],
+            Mr_unp=self.Mr_unp[idx][:, pt.sum(self.Mr_unp[idx], dim=0) > 0.5],
         )
 
     def __iter__(self) -> Generator[pt.Tensor, None, None]:
