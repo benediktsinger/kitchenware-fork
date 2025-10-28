@@ -78,7 +78,7 @@ def load_structure_unp(filepath: str, rm_wat=False, rm_hs=True) -> Structure:
         elements=np.array(element_l),
         resnames=np.array(resname_l),
         resids=np.array(resid_l, dtype=np.int32),
-        resids_ndb=np.array((resid_unp_l,label_seq_l)).T,
+        resids_ndb=np.array(resid_unp_l, dtype=np.int32), 
         chain_names=np.array(chain_name_l),
         active_site=np.zeros(len(resid_l), dtype=np.bool_),
     )
